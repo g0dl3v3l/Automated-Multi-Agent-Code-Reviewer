@@ -1,0 +1,24 @@
+# Core Infrastructure
+flask            # Backend API Framework [cite: 660]
+streamlit       # Frontend "War Room" Dashboard [cite: 660]
+python-dotenv    # Environment Variable Management [cite: 480]
+pydantic         # Data Validation & Schemas [cite: 662]
+requests        # HTTP Client
+
+# AI & Orchestration
+mistralai        # Mistral AI SDK (The Brains) [cite: 660]
+langgraph       # State Machine & Orchestration [cite: 660]
+
+# Agent A Tools: Security ("The Hawk")
+bandit           # AST-based Security Linter [cite: 661]
+safety           # Dependency CVE Scanner [cite: 661]
+
+# Agent B Tools: Performance ("The Speed Demon")
+radon            # Cyclomatic Complexity Calculator [cite: 661]
+
+# Agent C Tools: Maintainability ("The Purist")
+pylint           # Static Code Analysis & Naming Checks [cite: 661]
+pydocstyle       # Docstring Coverage Checker [cite: 661]
+
+# Utilities
+pytest           # Unit Testing
