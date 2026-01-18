@@ -57,6 +57,34 @@ class MistralProvider(LLMProvider):
         except Exception as e:
             logger.error(f"Mistral generation failed: {e}")
             raise e
+    def generate_json_response(self, system_prompt: str, user_content: str) -> dict:
+        """
+        Forces Mistral to output JSON mode.
+        """
+        try:
+            # Enforce JSON mode via prompt engineering + API parameters if supported
+            json_system_prompt = f"{system_prompt}\n\nIMPORTANT: Output ONLY valid JSON."
+            
+            messages = [
+                ChatMessage(role="system", content=json_system_prompt),
+                ChatMessage(role="user", content=user_content)
+            ]
+            
+            response = self.client.chat(
+                model=self.model,
+                messages=messages,
+                response_format={"type": "json_object"} # Force JSON mode
+            )
+            
+            raw_content = response.choices[0].message.content
+            return json.loads(raw_content)
+            
+        except json.JSONDecodeError:
+            logger.error("Failed to parse JSON from LLM response.")
+            raise ValueError("LLM did not return valid JSON.")
+        except Exception as e:
+            logger.error(f"Mistral JSON generation failed: {e}")
+            raise e
 
 # Factory function to get the configured provider
 def get_llm_client() -> LLMProvider:
