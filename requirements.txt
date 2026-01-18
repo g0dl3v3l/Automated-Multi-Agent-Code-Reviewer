@@ -22,3 +22,4 @@ pydocstyle       # Docstring Coverage Checker [cite: 661]
 
 # Utilities
 pytest           # Unit Testing
+pygments
