@@ -81,7 +81,8 @@ class ReviewMeta(BaseModel):
     final_verdict: FinalVerdict
     quality_score: int = Field(..., ge=0, le=100, description="0-100 score")
     risk_level: str = Field(..., description="CRITICAL, HIGH, or SAFE")
-
+    total_vulnerabilities: int = Field(..., description="Total count of issues detected") 
+    scan_duration_ms: float = 0.0
 class ReviewResponse(BaseModel):
     """
     The Root Level Output Object.

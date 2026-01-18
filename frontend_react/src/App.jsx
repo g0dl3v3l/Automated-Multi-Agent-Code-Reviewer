@@ -10,7 +10,8 @@ import {
   CheckCircle,
   ShieldAlert,
   X,
-  AlertOctagon, // <--- Added for notification icon
+  AlertOctagon,
+  Zap,
 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -21,24 +22,19 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [reviewData, setReviewData] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  // --- NEW STATE: Notification Message ---
   const [notification, setNotification] = useState(null);
 
-  // --- 1. HANDLE FILE UPLOAD (With Validation) ---
+  // --- 1. HANDLE FILE UPLOAD ---
   const handleUpload = (e) => {
     const uploaded = Array.from(e.target.files);
     const validNewFiles = [];
     const rejectedErrors = [];
 
     uploaded.forEach((file) => {
-      // Check 1: Empty File
       if (file.size === 0) {
         rejectedErrors.push(`${file.name} (Empty)`);
         return;
       }
-
-      // Check 2: Duplicate File (Check against existing files AND new batch)
       const isDuplicate =
         files.some((f) => f.name === file.name) ||
         validNewFiles.some((f) => f.name === file.name);
@@ -47,54 +43,42 @@ function App() {
         rejectedErrors.push(`${file.name} (Duplicate)`);
         return;
       }
-
-      // If valid, add to temporary list
       validNewFiles.push(file);
     });
 
-    // If there were errors, show notification for 4 seconds
     if (rejectedErrors.length > 0) {
       setNotification(`Ignored: ${rejectedErrors.join(", ")}`);
       setTimeout(() => setNotification(null), 4000);
     }
 
-    // Only update state if we have valid files
     if (validNewFiles.length > 0) {
-      setFiles((prevFiles) => {
-        const newFiles = [...prevFiles, ...validNewFiles];
-        return newFiles;
-      });
+      setFiles((prevFiles) => [...prevFiles, ...validNewFiles]);
     }
-
-    // Reset the input value
     e.target.value = null;
   };
 
-  // --- 2. HANDLE REMOVE FILE (Optional cleanup) ---
+  // --- 2. HANDLE REMOVE FILE ---
   const removeFile = (fileName, e) => {
-    e.stopPropagation(); // Stop clicking the file from selecting it
+    e.stopPropagation();
     setFiles(files.filter((f) => f.name !== fileName));
     if (selectedFile === fileName) setSelectedFile(null);
   };
 
-  // --- 3. HANDLE SCAN (Triggered by Button Only) ---
+  // --- 3. HANDLE SCAN ---
   const handleScan = async () => {
     if (files.length === 0) return;
 
     setLoading(true);
     const formData = new FormData();
-
-    // Add all currently piled up files to the payload
     files.forEach((f) => formData.append("files", f));
 
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/review",
+        "http://localhost:8000/api/review/full",
         formData
       );
       setReviewData(res.data);
 
-      // Auto-select first file if none selected
       if (files.length > 0 && !selectedFile) {
         setSelectedFile(files[0].name);
       }
@@ -122,7 +106,6 @@ function App() {
 
   return (
     <div className="app-layout">
-      {/* --- NEW: NOTIFICATION BANNER --- */}
       {notification && (
         <div className="toast-notification">
           <AlertOctagon size={18} color="#ff4d4d" />
@@ -130,33 +113,29 @@ function App() {
         </div>
       )}
 
-      {/* NAVBAR */}
       <nav className="navbar">
         <h1 className="cyber-header">
           <Activity /> AI CODE REVIEWER
         </h1>
       </nav>
 
-      {/* LEFT PANEL: EXPLORER */}
       <aside className="panel panel-left">
         <div className="panel-content">
           <div className="section-title">
             <FolderOpen size={18} /> EXPLORER
           </div>
 
-          {/* Upload Zone */}
           <label className="upload-zone">
             <UploadCloud size={32} color="#666" style={{ marginBottom: 10 }} />
             <div>Drag & drop files here</div>
             <input type="file" multiple onChange={handleUpload} hidden />
           </label>
 
-          {/* SCAN BUTTON - Now triggers handleScan */}
           {files.length > 0 && (
             <button
               className="scan-btn"
               disabled={loading}
-              onClick={handleScan} // <--- ACTION ATTACHED HERE
+              onClick={handleScan}
             >
               {loading ? (
                 "SCANNING..."
@@ -168,7 +147,6 @@ function App() {
             </button>
           )}
 
-          {/* File List */}
           <div style={{ marginTop: 20 }}>
             {files.map((f) => (
               <div
@@ -181,7 +159,6 @@ function App() {
                 <div className="file-name">
                   {getFileIcon(f.name)} {f.name}
                 </div>
-                {/* Remove Button */}
                 <button
                   onClick={(e) => removeFile(f.name, e)}
                   style={{
@@ -199,7 +176,6 @@ function App() {
         </div>
       </aside>
 
-      {/* CENTER PANEL: EDITOR */}
       <main className="panel panel-center">
         <div className="editor-wrapper">
           <div className="editor-header section-title">
@@ -218,7 +194,6 @@ function App() {
         </div>
       </main>
 
-      {/* RIGHT PANEL: INTELLIGENCE */}
       <aside className="panel panel-right">
         <div className="panel-content">
           <div className="section-title">
@@ -243,6 +218,25 @@ function App() {
                   </span>
                 </div>
                 <div className="score-label">QUALITY SCORE</div>
+              </div>
+
+              <div className="stat-grid">
+                <div className="stat-box">
+                  <div className="stat-value" style={{ color: "#ff4d4d" }}>
+                    {reviewData.meta.total_vulnerabilities}
+                  </div>
+                  <div className="stat-label">TOTAL ISSUES</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-value" style={{ color: "#ffa500" }}>
+                    {reviewData.meta.scan_duration_ms < 1000
+                      ? `${reviewData.meta.scan_duration_ms}ms`
+                      : `${(reviewData.meta.scan_duration_ms / 1000).toFixed(
+                          1
+                        )}s`}
+                  </div>
+                  <div className="stat-label">SCAN TIME</div>
+                </div>
               </div>
 
               <div style={{ marginTop: 20, marginBottom: 20 }}>
@@ -297,36 +291,67 @@ function App() {
   );
 }
 
-// --- SUB-COMPONENT: Custom Line-by-Line Renderer ---
+// --- SUB-COMPONENT: UPDATED FOR MULTI-EXPANSION ---
 const CodeRenderer = ({ file, issues }) => {
   const [content, setContent] = useState("");
-  const [activeIssueLine, setActiveIssueLine] = useState(null);
+
+  // CHANGED: Tracks an ARRAY of open IDs to allow multiple active issues
+  const [activeIssueIds, setActiveIssueIds] = useState([]);
 
   React.useEffect(() => {
     const reader = new FileReader();
     reader.onload = (e) => setContent(e.target.result);
     reader.readAsText(file);
-    setActiveIssueLine(null);
+    // Reset open issues when file changes
+    setActiveIssueIds([]);
   }, [file]);
 
-  const lines = content.split("\n");
+  // Helper to toggle a specific issue ID without closing others
+  const toggleIssue = (id) => {
+    setActiveIssueIds((prevIds) => {
+      if (prevIds.includes(id)) {
+        return prevIds.filter((i) => i !== id); // Close this one
+      } else {
+        return [...prevIds, id]; // Open this one (keep others)
+      }
+    });
+  };
 
-  return (
-    <div style={{ fontSize: 14, fontFamily: "Roboto Mono", lineHeight: 1.5 }}>
-      {lines.map((line, index) => {
-        const lineNum = index + 1;
-        const lineIssues = issues.filter((i) => i.line_start === lineNum);
-        const hasIssue = lineIssues.length > 0;
-        const isOpen = activeIssueLine === lineNum;
+  const rawLines = content.split("\n");
+  const renderedBlocks = [];
 
-        return (
-          <React.Fragment key={index}>
-            <div
-              className={`code-line ${hasIssue ? "line-has-issue" : ""}`}
-              onClick={() =>
-                hasIssue && setActiveIssueLine(isOpen ? null : lineNum)
-              }
-            >
+  let i = 0;
+  while (i < rawLines.length) {
+    const currentLineNum = i + 1;
+
+    // Check if an issue STARTS at this line
+    const startIssue = issues.find(
+      (issue) => issue.line_start === currentLineNum
+    );
+
+    if (startIssue) {
+      // --- CASE 1: START OF A MULTI-LINE ISSUE ---
+      const endLine = startIssue.line_end;
+      const linesInBlock = [];
+
+      for (let j = i; j < endLine && j < rawLines.length; j++) {
+        linesInBlock.push({
+          text: rawLines[j],
+          num: j + 1,
+        });
+      }
+
+      // Check if THIS specific issue is in the active list
+      const isOpen = activeIssueIds.includes(startIssue.id);
+
+      renderedBlocks.push(
+        <div
+          key={`issue-group-${startIssue.id}`}
+          className="issue-group-container"
+          onClick={() => toggleIssue(startIssue.id)} // <--- UPDATED TOGGLE
+        >
+          {linesInBlock.map((lineObj) => (
+            <div key={lineObj.num} className="code-line">
               <div
                 style={{
                   width: 40,
@@ -336,7 +361,7 @@ const CodeRenderer = ({ file, issues }) => {
                   userSelect: "none",
                 }}
               >
-                {lineNum}
+                {lineObj.num}
               </div>
               <div style={{ flex: 1, paddingLeft: 10 }}>
                 <SyntaxHighlighter
@@ -349,27 +374,65 @@ const CodeRenderer = ({ file, issues }) => {
                   }}
                   PreTag="span"
                 >
-                  {line || " "}
+                  {lineObj.text || " "}
                 </SyntaxHighlighter>
               </div>
             </div>
+          ))}
 
-            {hasIssue &&
-              isOpen &&
-              lineIssues.map((issue) => (
-                <div key={issue.id} className="issue-card-overlay">
-                  <div className="issue-title">
-                    <ShieldAlert size={16} /> {issue.title}
-                  </div>
-                  <div className="issue-body">{issue.body}</div>
-                  {issue.suggestion && (
-                    <div className="issue-fix">Fix: {issue.suggestion}</div>
-                  )}
-                </div>
-              ))}
-          </React.Fragment>
-        );
-      })}
+          {/* Render Popup if ID is in the Active List */}
+          {isOpen && (
+            <div
+              className="issue-card-overlay"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="issue-title">
+                <ShieldAlert size={16} /> {startIssue.title}
+              </div>
+              <div className="issue-body">{startIssue.body}</div>
+              {startIssue.suggestion && (
+                <div className="issue-fix">Fix: {startIssue.suggestion}</div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+
+      i = endLine;
+    } else {
+      // --- CASE 2: NORMAL LINE ---
+      renderedBlocks.push(
+        <div key={currentLineNum} className="code-line">
+          <div
+            style={{
+              width: 40,
+              color: "#666",
+              textAlign: "right",
+              paddingRight: 15,
+              userSelect: "none",
+            }}
+          >
+            {currentLineNum}
+          </div>
+          <div style={{ flex: 1, paddingLeft: 10 }}>
+            <SyntaxHighlighter
+              language="python"
+              style={vscDarkPlus}
+              customStyle={{ margin: 0, padding: 0, background: "transparent" }}
+              PreTag="span"
+            >
+              {rawLines[i] || " "}
+            </SyntaxHighlighter>
+          </div>
+        </div>
+      );
+      i++;
+    }
+  }
+
+  return (
+    <div style={{ fontSize: 14, fontFamily: "Roboto Mono", lineHeight: 1.5 }}>
+      {renderedBlocks}
     </div>
   );
 };

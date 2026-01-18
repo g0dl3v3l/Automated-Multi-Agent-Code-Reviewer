@@ -217,7 +217,24 @@ h3,
 .line-has-issue:hover {
   background-color: rgba(255, 77, 77, 0.25);
 }
+.issue-group-container {
+  background-color: rgba(255, 77, 77, 0.15); /* Continuous Red Block */
+  border-left: 3px solid var(--danger); /* Continuous Red Line */
+  cursor: pointer;
+  margin-bottom: 2px;
+  display: flex;
+  flex-direction: column;
+}
 
+.issue-group-container:hover {
+  background-color: rgba(255, 77, 77, 0.25);
+}
+
+/* Ensure lines inside the group don't have their own borders */
+.issue-group-container .code-line {
+  border-left: none;
+  background-color: transparent; /* Blend into the group container */
+}
 /* THE POPUP */
 .issue-card-overlay {
   background-color: #252526;
@@ -281,6 +298,36 @@ h3,
   font-size: 0.8rem;
   margin-top: 5px;
   letter-spacing: 2px;
+}
+
+/* --- NEW: STATS GRID (For Total Issues) --- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.stat-box {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #e0e0e0;
+  font-family: "Orbitron";
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: #8b949e;
+  margin-top: 4px;
+  text-transform: uppercase;
 }
 
 .verdict-tag {

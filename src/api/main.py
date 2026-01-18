@@ -4,24 +4,23 @@ Updated to allow CORS for the React Frontend.
 """
 
 from flask import Flask
-from flask_cors import CORS  # <--- NEW IMPORT
+from flask_cors import CORS
 from config.settings import settings
 from src.utils.logger import get_logger
-from src.api.routes import api_bp
+
+# Import the new blueprints
+from src.api.routes_core import core_bp
+from src.api.routes_agents import agents_bp
 
 logger = get_logger(__name__)
 
 def create_app() -> Flask:
-    """
-    Factory function to create and configure the Flask application.
-    """
     app = Flask(__name__)
-    
-    # Enable CORS for all routes (Allow React to talk to Flask)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     
-    # Register Routes
-    app.register_blueprint(api_bp, url_prefix='/api')
+    # Register Blueprints
+    app.register_blueprint(core_bp, url_prefix='/api')        # /api/review/full, /api/config
+    app.register_blueprint(agents_bp, url_prefix='/api/agents') # /api/agents/security
     
     return app
 
