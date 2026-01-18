@@ -8,8 +8,7 @@ the `LLMProvider` interface, not specific SDKs.
 from abc import ABC, abstractmethod
 from typing import Any, List, Dict
 import os
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
+from mistralai import Mistral
 
 from config.settings import settings
 from src.utils.logger import get_logger
@@ -39,41 +38,43 @@ class MistralProvider(LLMProvider):
             logger.error("MISTRAL_API_KEY not found in environment variables.")
             raise ValueError("MISTRAL_API_KEY is missing.")
             
-        self.client = MistralClient(api_key=api_key)
+        self.client = Mistral(api_key=api_key)
         self.model = "codestral-latest" # Using the specific code model
 
     def generate_response(self, system_prompt: str, user_content: str) -> str:
         try:
+            # v1.0 Change: Use dictionaries for messages instead of ChatMessage objects
             messages = [
-                ChatMessage(role="system", content=system_prompt),
-                ChatMessage(role="user", content=user_content)
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
             ]
             
-            response = self.client.chat(
+            # v1.0 Change: client.chat() -> client.chat.complete()
+            response = self.client.chat.complete(
                 model=self.model,
                 messages=messages
             )
             return response.choices[0].message.content
         except Exception as e:
-            logger.error(f"Mistral generation failed: {e}")
+            logger.error(f"Mistral text generation failed: {e}")
             raise e
     def generate_json_response(self, system_prompt: str, user_content: str) -> dict:
         """
-        Forces Mistral to output JSON mode.
+        Forces Mistral to output JSON mode using v1.0 syntax.
         """
         try:
-            # Enforce JSON mode via prompt engineering + API parameters if supported
             json_system_prompt = f"{system_prompt}\n\nIMPORTANT: Output ONLY valid JSON."
             
             messages = [
-                ChatMessage(role="system", content=json_system_prompt),
-                ChatMessage(role="user", content=user_content)
+                {"role": "system", "content": json_system_prompt},
+                {"role": "user", "content": user_content}
             ]
             
-            response = self.client.chat(
+            # v1.0 Change: response_format is passed directly
+            response = self.client.chat.complete(
                 model=self.model,
                 messages=messages,
-                response_format={"type": "json_object"} # Force JSON mode
+                response_format={"type": "json_object"} 
             )
             
             raw_content = response.choices[0].message.content

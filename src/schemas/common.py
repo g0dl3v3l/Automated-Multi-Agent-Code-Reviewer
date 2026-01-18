@@ -29,7 +29,7 @@ class Category(str, Enum):
     PERFORMANCE = "PERFORMANCE"
     MAINTAINABILITY = "MAINTAINABILITY"
     ARCHITECTURE = "ARCHITECTURE"
-
+    BEST_PRACTICE= "BEST_PRACTICE"
 class FinalVerdict(str, Enum):
     """The high-level decision on the Pull Request."""
     APPROVE = "APPROVE"

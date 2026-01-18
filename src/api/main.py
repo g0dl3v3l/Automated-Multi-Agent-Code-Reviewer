@@ -15,13 +15,17 @@ from src.api.routes_core import core_bp
 from src.agents.security.routes import security_bp
 from src.agents.performance.routes import performance_bp
 from src.agents.maintainability.routes import maintainability_bp
-
+from src.core.registry import AgentRegistry
+from src.agents.stub_agent import StubAgent
+from src.core.llm import get_llm_client
 logger = get_logger(__name__)
 
 def create_app() -> Flask:
     app = Flask(__name__)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
-    
+    llm = get_llm_client()
+    stub = StubAgent(name="System Test Agent", slug="stub-agent", llm_provider=llm)
+    AgentRegistry.register(stub)
     # --- REGISTER BLUEPRINTS ---
     
     # Core: /api/review/full, /api/config
