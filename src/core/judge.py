@@ -58,7 +58,7 @@ class Judge:
 
         # Determine Verdict and Risk Level
         if critical_count > 0:
-            verdict = FinalVerdict.REJECT
+            verdict = FinalVerdict.REQUEST_CHANGES
             risk = "CRITICAL"
         elif score < 70:
             verdict = FinalVerdict.REQUEST_CHANGES

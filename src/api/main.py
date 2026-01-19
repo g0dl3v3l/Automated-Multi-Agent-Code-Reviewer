@@ -3,6 +3,11 @@ Entry point for the Flask Backend API.
 Updated to allow CORS for the React Frontend.
 """
 
+from dotenv import load_dotenv
+import os
+load_dotenv()
+print(f"DEBUG: Tracing Enabled? {os.getenv('LANGSMITH_TRACING')}")
+print(f"DEBUG: API Key Present? {bool(os.getenv('LANGSMITH_API_KEY'))}")
 from flask import Flask
 from flask_cors import CORS
 from config.settings import settings
@@ -18,14 +23,24 @@ from src.agents.maintainability.routes import maintainability_bp
 from src.core.registry import AgentRegistry
 from src.agents.stub_agent import StubAgent
 from src.core.llm import get_llm_client
+from src.agents.security.agent import SecurityAgent
 logger = get_logger(__name__)
 
 def create_app() -> Flask:
     app = Flask(__name__)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
-    llm = get_llm_client()
-    stub = StubAgent(name="System Test Agent", slug="stub-agent", llm_provider=llm)
-    AgentRegistry.register(stub)
+    
+    llm_provider = get_llm_client()
+
+    # 2. Inject Provider into Agent
+    sec_agent = SecurityAgent(
+        name="Security Hawk", 
+        slug="security-agent", 
+        llm_provider=llm_provider # <--- INJECTED HERE
+    )
+    stub = StubAgent(name="System Test Agent", slug="stub-agent", llm_provider=llm_provider)
+    #AgentRegistry.register(stub)
+    AgentRegistry.register(sec_agent)
     # --- REGISTER BLUEPRINTS ---
     
     # Core: /api/review/full, /api/config
