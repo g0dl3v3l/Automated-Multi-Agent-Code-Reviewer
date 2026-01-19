@@ -15,6 +15,9 @@ from src.schemas.common import (
     AgentPayload,
     ReviewContext,
     ReviewIssue,
+    ReviewMeta,
+    FinalVerdict
+
 )
 from src.core.registry import AgentRegistry
 from src.core.judge import Judge
@@ -37,6 +40,8 @@ class ReviewController:
         """Initializes the ReviewController with a Judge instance."""
         self.judge = Judge()
 
+    
+    
     async def run_full_scan(
         self, files: List[SourceFile], review_id: str
     ) -> ReviewResponse:
@@ -55,42 +60,48 @@ class ReviewController:
                 summary, and detailed comments.
         """
         start_time = time.time()
-
+        
         # 1. Prepare Payload
         payload = AgentPayload(
-            target_files=files, context=ReviewContext(risk_level="Standard")
+            target_files=files, context=ReviewContext()
         )
 
-        # 2. Retrieve Agents
+        # 2. Run Agents (Security)
         agents = AgentRegistry.get_all()
         if not agents:
-            logger.warning("No agents registered! Returning empty review.")
-            return self._build_empty_response(review_id, 0.0)
+             return self._build_empty_response(review_id, 0.0)
 
-        # 3. Run Agents Parallelly (AsyncIO)
         logger.info(f"Dispatching to {len(agents)} agents...")
         tasks = [self._safe_run_agent(agent, payload) for agent in agents]
-        
-        # Unpack results from the list of lists
-        results: List[List[ReviewIssue]] = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
 
-        # 4. Flatten Results
+        # Flatten list of lists
         all_issues = []
         for agent_issues in results:
             all_issues.extend(agent_issues)
 
-        # 5. Judge the Results
         duration_ms = (time.time() - start_time) * 1000
-        meta = self.judge.evaluate(all_issues, duration_ms)
-        summary = self.judge.generate_summary(all_issues)
 
+        # 3. Call Judge
+        judge_result = self.judge.evaluate(all_issues)
+
+        # 4. Construct Meta (Strict Adherence to Contract)
+        review_meta = ReviewMeta(
+            final_verdict=judge_result["final_verdict"],
+            quality_score=judge_result["quality_score"],
+            risk_level=judge_result["risk_level"],
+            total_vulnerabilities=judge_result["total_vulnerabilities"],
+            scan_duration_ms=duration_ms
+        )
+
+        # 5. Return Final Response
         return ReviewResponse(
             review_id=review_id,
             timestamp=str(time.time()),
-            meta=meta,
-            summary=summary,
-            praise=["System operational."],  # Placeholder
-            comments=all_issues,
+            meta=review_meta,
+            summary=judge_result["summary"],
+            praise=["System operational."],
+            comments=all_issues
         )
 
     async def _safe_run_agent(self, agent: Any, payload: AgentPayload) -> List[ReviewIssue]:
@@ -127,7 +138,13 @@ class ReviewController:
         return ReviewResponse(
             review_id=review_id,
             timestamp=str(time.time()),
-            meta=self.judge.evaluate([], duration),
+            meta=ReviewMeta(
+                final_verdict=FinalVerdict.COMMENT_ONLY,
+                quality_score=0,
+                risk_level="Unknown",
+                total_vulnerabilities=0,
+                scan_duration_ms=duration
+            ),
             summary="No agents were active.",
             praise=[],
             comments=[],

@@ -1,20 +1,43 @@
 import os
 import subprocess
-from flask import Flask, request
+import pickle
+import base64
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
+AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE" 
+STRIPE_API_TOKEN = "sk_live_51Mz9JbKq812345abcdefGHIJKLMNOPqrstuvwxyz"
 
-AWS_SECRET = "AKIAIOSFODNN7EXAMPLE" 
-DB_PASSWORD = "super_secret_password_123!"
+FILE_INTEGRITY_CHECKSUM = "a1b2c3d4e5f67890abcdef1234567890abcdef12" 
 
+@app.route("/admin/system_health")
+def system_check():
+    check_cmd = request.args.get("cmd", "uptime")
+    subprocess.call(check_cmd, shell=True)
+    return "Check complete"
 
-@app.route("/delete_db")
-def delete_database():
+@app.route("/admin/calculator")
+def calc_tool():
+    expression = request.args.get("expr")
+    result = eval(expression) 
+    return str(result)
 
-    user_cmd = request.args.get("cmd")
-    subprocess.call(user_cmd, shell=True) 
-    return "Database deleted!"
+@app.route("/api/deserialize")
+def load_config():
+    data = request.args.get("payload")
+    decoded = base64.b64decode(data)
+    obj = pickle.loads(decoded)
+    return jsonify(obj)
+
+@app.route("/admin/delete_all_users", methods=["POST"])
+def nuke_database():
+    return "Users deleted!"
+
+@dummy_auth_wrapper
+@app.route("/admin/dashboard")
+def dashboard():
+    return "Welcome Admin"
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
