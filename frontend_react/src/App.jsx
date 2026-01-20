@@ -297,7 +297,7 @@ function App() {
   );
 }
 
-// --- SUB-COMPONENT: ORIGINAL STRUCTURE WITH MULTI-TAG INJECTION ---
+// --- SUB-COMPONENT: UPDATED FOR MULTI-EXPANSION WITH UNIQUE TAGS ---
 const CodeRenderer = ({ file, issues }) => {
   const [content, setContent] = useState("");
 
@@ -397,17 +397,19 @@ const CodeRenderer = ({ file, issues }) => {
                   {lineObj.text || " "}
                 </SyntaxHighlighter>
 
-                {/* [NEW] INJECT TAGS ONLY ON THE FIRST LINE OF THE BLOCK */}
+                {/* [FIXED] INJECT TAGS ONLY ON THE FIRST LINE (DEDUPLICATED) */}
                 {idx === 0 && (
                   <div className="tag-container" style={{ marginLeft: "15px" }}>
-                    {allIssuesHere.map((issue, tIdx) => (
-                      <span
-                        key={tIdx}
-                        className={`issue-tag tag-${issue.category.toLowerCase()}`}
-                      >
-                        {issue.category}
-                      </span>
-                    ))}
+                    {[...new Set(allIssuesHere.map((i) => i.category))].map(
+                      (cat, tIdx) => (
+                        <span
+                          key={tIdx}
+                          className={`issue-tag tag-${cat.toLowerCase()}`}
+                        >
+                          {cat}
+                        </span>
+                      ),
+                    )}
                   </div>
                 )}
               </div>
