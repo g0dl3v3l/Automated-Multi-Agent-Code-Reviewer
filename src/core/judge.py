@@ -5,7 +5,7 @@ This module contains the logic for evaluating findings from all agents,
 calculating quality scores, and issuing a final verdict for the Pull Request.
 """
 from typing import List, Dict, Any, Set
-from collections import Counter
+from collections import Counter, defaultdict
 from src.schemas.common import ReviewIssue, FinalVerdict, Severity
 from src.utils.logger import get_logger
 
@@ -23,10 +23,11 @@ class Judge:
         """
         Analyzes the aggregated issues to produce a final report.
 
-        This method performs three key actions:
+        This method performs four key actions:
         1. Deduplicates issues to remove redundant findings.
         2. Calculates a weighted 'Quality Score' (0-100) based on severity.
         3. Determines the final verdict (APPROVE, REQUEST_CHANGES, etc.).
+        4. Aggregates issues by line number for the UI "Multi-Tag" view.
 
         Args:
             issues (List[ReviewIssue]): A raw list of issues collected from all agents.
@@ -40,6 +41,7 @@ class Judge:
                 - total_vulnerabilities (int): Count of unique issues.
                 - summary (str): A human-readable summary string.
                 - clean_issues (List[ReviewIssue]): The deduplicated list of issues.
+                - file_line_map (Dict): The aggregated map for UI line annotations.
         """
         # 1. Deduplication (Now Multi-Line Aware)
         clean_issues = self._deduplicate_issues(issues)
@@ -85,6 +87,9 @@ class Judge:
         
         summary_text = f"Found {len(clean_issues)} unique issues ({cat_summary}). Risk: {risk_level}."
 
+        # 6. Aggregation for UI (The "Multi-Tag" Map)
+        file_line_map = self._aggregate_by_line(clean_issues)
+
         logger.info(f"Verdict: {final_verdict.value} | Score: {score} | Breakdown: {cat_summary}")
 
         return {
@@ -93,7 +98,8 @@ class Judge:
             "risk_level": risk_level,
             "total_vulnerabilities": len(clean_issues),
             "summary": summary_text,
-            "clean_issues": clean_issues 
+            "clean_issues": clean_issues,
+            "file_line_map": file_line_map  # <--- NEW FIELD FOR UI
         }
 
     def _deduplicate_issues(self, issues: List[ReviewIssue]) -> List[ReviewIssue]:
@@ -128,6 +134,38 @@ class Judge:
                 logger.debug(f"Duplicate issue dropped: {fingerprint}")
         
         return unique_issues
+
+    def _aggregate_by_line(self, issues: List[ReviewIssue]) -> Dict[str, Dict[int, List[ReviewIssue]]]:
+        """
+        Groups issues by File and Line Number to support "Multi-Tag" UI.
+
+        Constructs a nested dictionary mapping file paths to line numbers,
+        where each line number points to a list of issues found on that line.
+
+        Structure:
+        {
+            "main.py": {
+                10: [IssueA (Security), IssueB (Performance)],
+                25: [IssueC]
+            }
+        }
+
+        Args:
+            issues (List[ReviewIssue]): The list of unique issues.
+
+        Returns:
+            Dict[str, Dict[int, List[ReviewIssue]]]: The aggregation map.
+        """
+        agg_map = defaultdict(lambda: defaultdict(list))
+
+        for issue in issues:
+            # We use line_start as the anchor for the UI badge.
+            # The issue object itself contains line_end, so the UI can still
+            # highlight the full range when the user clicks the badge.
+            agg_map[issue.file_path][issue.line_start].append(issue)
+
+        # Convert defaultdict back to standard dict for clean JSON serialization
+        return {k: dict(v) for k, v in agg_map.items()}
 
     def _get_deduction(self, severity: Severity) -> int:
         """

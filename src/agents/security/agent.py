@@ -7,6 +7,7 @@ and maps the LLM's findings back into ReviewIssue objects.
 
 import json
 import uuid
+import re  # <--- [CHANGE 1] Added Regex import
 from typing import List, Any
 
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -21,10 +22,11 @@ from src.schemas.common import (
 )
 from src.utils.logger import get_logger
 from src.agents.security.graph import build_security_graph, SECURITY_TOOLS
-from langchain_core.globals import set_debug  # <--- WORKS (included in core)
+from langchain_core.globals import set_debug
+
 logger = get_logger(__name__)
 
-# --- System Prompt ---
+# --- [CHANGE 2] STRICTER System Prompt ---
 SECURITY_SYSTEM_PROMPT = """
 You are "The Hawk", a Senior Security Auditor.
 Your goal is to audit code for security vulnerabilities using deterministic tools.
@@ -38,9 +40,13 @@ Your goal is to audit code for security vulnerabilities using deterministic tool
     * High Entropy variable named `checksum`? IGNORE.
     * High Entropy variable named `api_key`? REPORT.
 
-### OUTPUT FORMAT:
-Return a SINGLE JSON object containing a list of issues. Do not use Markdown.
-Format:
+### CRITICAL OUTPUT INSTRUCTIONS:
+* You must output **ONLY VALID JSON**.
+* **DO NOT** include conversational text like "Here is the analysis" or "I found the following".
+* **DO NOT** wrap the output in Markdown blocks (like ```json ... ```) unless absolutely necessary.
+* Start your response directly with the character `{`.
+
+### JSON FORMAT:
 {
   "issues": [
     {
@@ -74,7 +80,7 @@ class SecurityAgent(BaseAgent):
         """
         # 1. Initialize Base Class (Contract Fulfillment)
         super().__init__(name=name, slug=slug, llm_provider=llm_provider)
-        #set_debug(True)
+        set_debug(True)
         # 2. Get the specific model for this agent (LangChain compatible)
         # We use a lower temperature for deterministic security analysis
         self.model = self.llm.get_chat_model(temperature=0.1)
@@ -121,10 +127,8 @@ class SecurityAgent(BaseAgent):
                 last_message = final_state["messages"][-1]
                 response_text = last_message.content
 
-                # Clean potential markdown fences from LLM
-                cleaned_text = response_text.replace("```json", "").replace("```", "").strip()
-                
-                llm_output = json.loads(cleaned_text)
+                # --- [CHANGE 3] Use robust parsing helper instead of simple replace ---
+                llm_output = self._parse_json(response_text)
                 found_issues = llm_output.get("issues", [])
 
                 # 4. Map JSON to ReviewIssue Objects
@@ -144,12 +148,36 @@ class SecurityAgent(BaseAgent):
                     )
                     all_issues.append(mapped_issue)
 
-            except json.JSONDecodeError:
-                logger.error(f"Failed to parse Security Agent JSON for {file_data.file_path}")
             except Exception as e:
                 logger.error(f"Security Agent failed on {file_data.file_path}: {e}")
 
         return all_issues
+
+    def _parse_json(self, text: str) -> dict:
+        """
+        Robustly extracts JSON from LLM output using Regex.
+        """
+        try:
+            # 1. Try direct parsing first
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        try:
+            # 2. Try Regex Extraction (Look for outermost curly braces)
+            match = re.search(r"(\{.*\})", text, re.DOTALL)
+            if match:
+                return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+            
+        # 3. Last resort cleanup
+        cleaned = text.replace("```json", "").replace("```", "").strip()
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+             logger.error(f"Failed to parse JSON. Raw content preview: {text[:200]}...")
+             return {"issues": []}
 
     def get_tools(self) -> List[Any]:
         """Retrieves the list of tools available to this agent."""

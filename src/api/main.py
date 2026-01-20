@@ -24,6 +24,7 @@ from src.core.registry import AgentRegistry
 from src.agents.stub_agent import StubAgent
 from src.core.llm import get_llm_client
 from src.agents.security.agent import SecurityAgent
+from src.agents.performance.agent import PerformanceAgent
 logger = get_logger(__name__)
 
 def create_app() -> Flask:
@@ -38,9 +39,16 @@ def create_app() -> Flask:
         slug="security-agent", 
         llm_provider=llm_provider # <--- INJECTED HERE
     )
+
+    perf_agent = PerformanceAgent(           # <--- 2. INITIALIZE AGENT B
+        name="The Architect",
+        slug="performance-agent",
+        llm_provider=llm_provider
+    )
     stub = StubAgent(name="System Test Agent", slug="stub-agent", llm_provider=llm_provider)
     #AgentRegistry.register(stub)
     AgentRegistry.register(sec_agent)
+    AgentRegistry.register(perf_agent)
     # --- REGISTER BLUEPRINTS ---
     
     # Core: /api/review/full, /api/config

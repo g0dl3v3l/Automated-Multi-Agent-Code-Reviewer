@@ -75,7 +75,7 @@ function App() {
     try {
       const res = await axios.post(
         "http://localhost:8000/api/review/full",
-        formData
+        formData,
       );
       setReviewData(res.data);
 
@@ -92,7 +92,11 @@ function App() {
   // --- HELPERS ---
   const getFileIcon = (fname) => {
     if (!reviewData) return <FileCode size={16} />;
-    const issues = reviewData.comments.filter((c) => c.file_path === fname);
+
+    // Fallback support for both data structures
+    const issueList = reviewData.clean_issues || reviewData.comments || [];
+    const issues = issueList.filter((c) => c.file_path === fname);
+
     if (issues.some((i) => i.severity === "CRITICAL"))
       return <ShieldAlert color="#ff4d4d" size={16} />;
     if (issues.length > 0) return <AlertTriangle color="orange" size={16} />;
@@ -101,7 +105,9 @@ function App() {
 
   const currentFileObj = files.find((f) => f.name === selectedFile);
   const currentIssues = reviewData
-    ? reviewData.comments.filter((c) => c.file_path === selectedFile)
+    ? (reviewData.clean_issues || reviewData.comments || []).filter(
+        (c) => c.file_path === selectedFile,
+      )
     : [];
 
   return (
@@ -200,7 +206,7 @@ function App() {
             <Activity size={18} /> INTELLIGENCE
           </div>
 
-          {reviewData && (
+          {reviewData && reviewData.meta && (
             <>
               <div className="score-box">
                 <div
@@ -232,7 +238,7 @@ function App() {
                     {reviewData.meta.scan_duration_ms < 1000
                       ? `${reviewData.meta.scan_duration_ms}ms`
                       : `${(reviewData.meta.scan_duration_ms / 1000).toFixed(
-                          1
+                          1,
                         )}s`}
                   </div>
                   <div className="stat-label">SCAN TIME</div>
@@ -277,7 +283,7 @@ function App() {
                 >
                   👍 COMMENDATIONS
                 </h4>
-                {reviewData.praise.map((p, i) => (
+                {(reviewData.praise || []).map((p, i) => (
                   <div key={i} className="praise-item">
                     <CheckCircle size={14} /> {p}
                   </div>
@@ -291,11 +297,11 @@ function App() {
   );
 }
 
-// --- SUB-COMPONENT: UPDATED FOR MULTI-EXPANSION ---
+// --- SUB-COMPONENT: ORIGINAL STRUCTURE WITH MULTI-TAG INJECTION ---
 const CodeRenderer = ({ file, issues }) => {
   const [content, setContent] = useState("");
 
-  // CHANGED: Tracks an ARRAY of open IDs to allow multiple active issues
+  // Tracks an ARRAY of open IDs to allow multiple active issues
   const [activeIssueIds, setActiveIssueIds] = useState([]);
 
   React.useEffect(() => {
@@ -326,11 +332,17 @@ const CodeRenderer = ({ file, issues }) => {
 
     // Check if an issue STARTS at this line
     const startIssue = issues.find(
-      (issue) => issue.line_start === currentLineNum
+      (issue) => issue.line_start === currentLineNum,
     );
 
     if (startIssue) {
       // --- CASE 1: START OF A MULTI-LINE ISSUE ---
+
+      // [NEW] Get ALL issues starting here for the badges
+      const allIssuesHere = issues.filter(
+        (issue) => issue.line_start === currentLineNum,
+      );
+
       const endLine = startIssue.line_end;
       const linesInBlock = [];
 
@@ -348,9 +360,9 @@ const CodeRenderer = ({ file, issues }) => {
         <div
           key={`issue-group-${startIssue.id}`}
           className="issue-group-container"
-          onClick={() => toggleIssue(startIssue.id)} // <--- UPDATED TOGGLE
+          onClick={() => toggleIssue(startIssue.id)}
         >
-          {linesInBlock.map((lineObj) => (
+          {linesInBlock.map((lineObj, idx) => (
             <div key={lineObj.num} className="code-line">
               <div
                 style={{
@@ -363,7 +375,14 @@ const CodeRenderer = ({ file, issues }) => {
               >
                 {lineObj.num}
               </div>
-              <div style={{ flex: 1, paddingLeft: 10 }}>
+              <div
+                style={{
+                  flex: 1,
+                  paddingLeft: 10,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
                 <SyntaxHighlighter
                   language="python"
                   style={vscDarkPlus}
@@ -371,11 +390,26 @@ const CodeRenderer = ({ file, issues }) => {
                     margin: 0,
                     padding: 0,
                     background: "transparent",
+                    flex: 1,
                   }}
                   PreTag="span"
                 >
                   {lineObj.text || " "}
                 </SyntaxHighlighter>
+
+                {/* [NEW] INJECT TAGS ONLY ON THE FIRST LINE OF THE BLOCK */}
+                {idx === 0 && (
+                  <div className="tag-container" style={{ marginLeft: "15px" }}>
+                    {allIssuesHere.map((issue, tIdx) => (
+                      <span
+                        key={tIdx}
+                        className={`issue-tag tag-${issue.category.toLowerCase()}`}
+                      >
+                        {issue.category}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -386,16 +420,26 @@ const CodeRenderer = ({ file, issues }) => {
               className="issue-card-overlay"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="issue-title">
-                <ShieldAlert size={16} /> {startIssue.title}
-              </div>
-              <div className="issue-body">{startIssue.body}</div>
-              {startIssue.suggestion && (
-                <div className="issue-fix">Fix: {startIssue.suggestion}</div>
-              )}
+              {/* [UPDATED] MAP OVER ALL ISSUES AT THIS LOCATION */}
+              {allIssuesHere.map((issue, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    marginBottom: idx < allIssuesHere.length - 1 ? "15px" : "0",
+                  }}
+                >
+                  <div className="issue-title">
+                    <ShieldAlert size={16} /> {issue.title}
+                  </div>
+                  <div className="issue-body">{issue.body}</div>
+                  {issue.suggestion && (
+                    <div className="issue-fix">Fix: {issue.suggestion}</div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
-        </div>
+        </div>,
       );
 
       i = endLine;
@@ -424,7 +468,7 @@ const CodeRenderer = ({ file, issues }) => {
               {rawLines[i] || " "}
             </SyntaxHighlighter>
           </div>
-        </div>
+        </div>,
       );
       i++;
     }
