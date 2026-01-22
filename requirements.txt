@@ -26,3 +26,5 @@ pygments
 langgraph
 langchain-mistralai
 langchain-core
+tree_sitter
+tree_sitter_languages

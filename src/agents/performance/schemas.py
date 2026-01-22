@@ -1,36 +1,42 @@
 """
-Schemas for the Performance Agent Tools.
+Schemas for the Performance Agent Tools (Polyglot Edition).
 
 This module defines the strict Pydantic models used to structure the output
-of the static analysis tools. These schemas provide the "Structural Map"
-that enables the LLM to diagnose architectural and performance issues.
+of the static analysis tools. These schemas provide the "Universal Structure Map"
+that enables the LLM to diagnose architectural issues across languages (Python, JS, Go, etc.).
 """
 
 from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field
 
-# --- Tool 1: Code Structure (The Blueprint) ---
+# --- Tool 1: Code Structure (The Universal Blueprint) ---
 
 class FunctionAnalysis(BaseModel):
-    """Structural metrics for a single function."""
+    """Structural metrics for a single function (or method/closure)."""
     name: str = Field(..., description="Name of the function")
     start_line: int
+    end_line: int = Field(..., description="End line for range highlighting")
     loc: int = Field(..., description="Lines of Code count")
     arg_count: int = Field(..., description="Number of arguments")
-    complexity: int = Field(..., description="Cognitive Complexity score")
-    external_calls: List[str] = Field(..., description="List of external dependencies called")
+    complexity: int = Field(..., description="Cyclomatic Complexity score")
+    nesting_depth: int = Field(..., description="Deepest nesting level (e.g., if inside for inside while)")
+    patterns: List[str] = Field(default_factory=list, description="Detected patterns: 'inner_class', 'recursive', 'react_hook', 'factory'")
+    dependencies: List[str] = Field(..., description="List of external calls or dependencies")
     is_async: bool
 
 class ClassAnalysis(BaseModel):
-    """Structural metrics for a single class."""
+    """Structural metrics for a single class (or struct/component)."""
     name: str
     start_line: int
-    method_count: int = Field(..., description="Number of methods (indicator of God Class)")
-    attribute_count: int = Field(..., description="Number of attributes inferred from __init__")
+    end_line: int
+    method_count: int = Field(..., description="Number of methods/functions inside")
+    attribute_count: int = Field(..., description="Number of attributes/properties")
+    patterns: List[str] = Field(default_factory=list, description="Detected patterns: 'visitor', 'singleton', 'god_class'")
     docstring_present: bool
 
 class StructureOutput(BaseModel):
     """Output model for the analyze_code_structure tool."""
+    language_detected: str = Field(..., description="The language parsed (e.g., 'python', 'javascript', 'unknown')")
     summary: Dict[str, int] = Field(..., description="Counts of classes and functions")
     classes: List[ClassAnalysis]
     functions: List[FunctionAnalysis]
@@ -40,8 +46,8 @@ class StructureOutput(BaseModel):
 
 class LoopOperation(BaseModel):
     """Details of a function call occurring inside a loop."""
-    call: str = Field(..., description="The function being called (e.g. User.objects.get)")
-    type: str = Field(..., description="Category (ORM, External, Generic)")
+    call: str = Field(..., description="The function being called (e.g. User.objects.get or api.fetch)")
+    type: str = Field(..., description="Category (DB, API, Generic)")
     line: int
 
 class LoopInfo(BaseModel):

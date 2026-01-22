@@ -11,43 +11,38 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import BaseMessage
 from langchain_core.tools import tool
-# 1. IMPORT THIS REDUCER
 from langgraph.graph.message import add_messages 
 
 from src.agents.performance.tools import (
     analyze_code_structure,
-    inspect_loop_mechanics,
-    map_async_execution,
-    trace_data_flow
+    inspect_loop_mechanics
 )
 
-# ... (Tools definitions remain the same) ...
+# --- 1. Define Tools Wrappers ---
 
 @tool
 def scan_structure(code: str):
-    """Analyzes Class/Function topology. Use this FIRST."""
+    """
+    Universal Structure Mapper.
+    Returns the 'Map' of the code (Classes, Functions, Dependencies, Async status).
+    Use this FIRST for every file.
+    """
     return analyze_code_structure(code)
 
 @tool
 def scan_loops(code: str):
-    """X-Rays loops for N+1 queries."""
+    """
+    Deep Loop Inspector.
+    X-Rays loops to find specific N+1 query patterns or heavy IO operations.
+    Use this only if 'scan_structure' suggests database/network usage.
+    """
     return inspect_loop_mechanics(code)
 
-@tool
-def scan_async(code: str):
-    """Checks for blocking calls inside async functions."""
-    return map_async_execution(code)
+# Consolidated Toolset
+PERFORMANCE_TOOLS = [scan_structure, scan_loops]
 
-@tool
-def scan_resources(code: str):
-    """Checks for memory leaks and infinite loops."""
-    return trace_data_flow(code)
-
-PERFORMANCE_TOOLS = [scan_structure, scan_loops, scan_async, scan_resources]
-
-# --- 2. Define State (FIXED) ---
+# --- 2. Define State ---
 class AgentState(TypedDict):
-    # CHANGED: Use add_messages to APPEND instead of OVERWRITE
     messages: Annotated[List[BaseMessage], add_messages]
     filename: str
     file_content: str

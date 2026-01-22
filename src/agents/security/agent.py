@@ -68,7 +68,7 @@ class SecurityAgent(BaseAgent):
 
     def __init__(self, name: str, slug: str, llm_provider: LLMProvider):
         super().__init__(name=name, slug=slug, llm_provider=llm_provider)
-        set_debug(True)
+        #set_debug(True)
         # Low temp for deterministic security analysis
         self.model = self.llm.get_chat_model(temperature=0.1)
         self.graph = build_security_graph(self.model)
